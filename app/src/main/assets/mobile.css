@@ -56,3 +56,6 @@ body.asdi-android-chat-only #asdi-chat-workspace .asdi-room-compose textarea{
  #asdi-chat-workspace.asdi-room .asdi-room-sticker{max-width:min(180px,55vw)!important;width:auto!important}
  #asdi-chat-workspace.asdi-room .asdi-employees-panel{position:fixed!important;z-index:45!important}
 }
+
+/* v3.41: WebView occupies the area above the native 42dp footer. */
+@media(max-width:700px){#asdi-chat-workspace.asdi-room{height:calc(100dvh - 112px)!important;}}

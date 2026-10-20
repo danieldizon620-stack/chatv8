@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
   private static final String CHANNEL = "asdi_chat_messages";
   private WebView web;
   private TextView badge;
+  private TextView footer;
   private FrameLayout root;
   private ValueCallback<Uri[]> fileCallback;
   private Uri pendingPhoto;
@@ -98,7 +99,19 @@ public class MainActivity extends Activity {
     }
     root = new FrameLayout(this);
     web = new WebView(this);
-    root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+    FrameLayout.LayoutParams webParams = new FrameLayout.LayoutParams(-1, -1);
+    webParams.bottomMargin = dp(42);
+    root.addView(web, webParams);
+    footer = new TextView(this);
+    footer.setText("ASDI Chatroom v3.41  •  Created by dannyboi620     Log out  ↪");
+    footer.setTextColor(0xFF263744);
+    footer.setTextSize(11);
+    footer.setGravity(Gravity.CENTER);
+    footer.setBackgroundColor(0xFFF1F5F7);
+    footer.setPadding(dp(6), 0, dp(6), 0);
+    FrameLayout.LayoutParams fp = new FrameLayout.LayoutParams(-1, dp(42), Gravity.BOTTOM);
+    root.addView(footer, fp);
+    footer.setOnClickListener(v -> confirmLogout());
     badge = new TextView(this);
     badge.setTextColor(Color.WHITE);
     badge.setTextSize(13);
@@ -131,6 +144,23 @@ public class MainActivity extends Activity {
     web.getSettings().setAllowContentAccess(true);
     android.webkit.CookieManager.getInstance().setAcceptCookie(true);
     web.addJavascriptInterface(new Object() {
+      @JavascriptInterface public void onLogout(String status) {
+        runOnUiThread(() -> {
+          if (!"ok".equals(status)) {
+            new AlertDialog.Builder(MainActivity.this)
+              .setTitle("Log out failed")
+              .setMessage("Could not end the server session. Check the ASDI Ticketing v3.34 update and your connection.")
+              .setPositiveButton("OK", null).show();
+            return;
+          }
+          returningFromLogin = false;
+          clearBadge();
+          CookieManager.getInstance().removeAllCookies(null);
+          CookieManager.getInstance().flush();
+          web.clearHistory();
+          web.loadUrl(base + "login.php");
+        });
+      }
       @JavascriptInterface public void onMessages(String raw, String count) {
         try {
           final long newest = Long.parseLong(raw);
@@ -418,7 +448,29 @@ public class MainActivity extends Activity {
     }
   }
   // No Android action-bar menu or tabs. The WebView is the only main screen.
-  @Override public boolean onCreateOptionsMenu(Menu menu) { return false; }
+  @Override public boolean onCreateOptionsMenu(Menu menu) {
+    menu.add("Log out");
+    return true;
+  }
+  @Override public boolean onOptionsItemSelected(MenuItem item) {
+    if ("Log out".contentEquals(item.getTitle())) { confirmLogout(); return true; }
+    return super.onOptionsItemSelected(item);
+  }
+  private void confirmLogout() {
+    new AlertDialog.Builder(this).setTitle("Log out of ASDI Chatroom?")
+      .setMessage("Your current session will end.")
+      .setNegativeButton("Cancel", null)
+      .setPositiveButton("Log out", (dialog, which) -> logout())
+      .show();
+  }
+  private void logout() {
+    // End the server-side PHP session first. The endpoint is installed by
+    // the companion v3.34 server upgrade; never merely navigate to login.
+    web.evaluateJavascript("(function(){fetch('mobile_logout.php',{method:'POST',credentials:'same-origin',cache:'no-store'})" +
+      ".then(r=>{if(!r.ok)throw Error('logout failed');return r.json()})" +
+      ".then(j=>{if(j&&j.ok)ASDI.onLogout('ok');else ASDI.onLogout('error')})" +
+      ".catch(()=>ASDI.onLogout('error'));})()", null);
+  }
 
   private int dp(int v) { return (int)(v * getResources().getDisplayMetrics().density + .5f); }
   private void updateMessages(long newest, int incoming) {
